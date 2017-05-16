@@ -1,0 +1,85 @@
+#!/bin/bash
+
+### Configurable Options ###
+
+
+
+### Do not edit beyond this line ###
+
+xscreensaver_config_file="$HOME/.xscreensaver"
+
+get_polling_interval()
+{
+    # echo "Looking for $xscreensaver_config_file"
+    if [ -f "$xscreensaver_config_file" ]; then
+        # echo "Found XScreenSaver config file"
+        timeout_seconds=$(grep timeout $xscreensaver_config_file | awk -F: '{ print ($2 * 3600) + ($3 * 60) + $4 }')
+        # echo "XScreenSaver Timeout is $timeout_seconds seconds"
+        
+        # Set polling interval to 5 seconds less than XScreenSaver timeout
+        polling_interval=$(($timeout_seconds - 5))
+    else
+        # echo "Could not find config file. Defaulting to 55 seconds."
+        polling_interval=55
+    fi
+}
+
+# Start XScreenSaver
+start_xscreensaver() 
+{
+    # echo "Starting XScreenSaver"
+    xscreensaver -nosplash & > /dev/null
+}
+
+delay_xscreensaver()
+{
+    # echo "Deactivating XScreenSaver"
+    xscreensaver-command -deactivate > /dev/null
+}
+
+check_for_video_running()
+{
+    pacmd_output=$(pacmd list-sink-inputs)
+    # if (echo $pacmd_output | grep -q 'media.role = "video"'); then
+    if [[ $pacmd_output =~ 'media.role = "video"' ]]; then
+        video_open=true
+    else
+        video_open=false
+    fi
+
+    if [[ $pacmd_output =~ 'state: RUNNING' ]]; then
+        application_running=true
+    else
+        application_running=false
+    fi
+
+    if $video_open && $application_running; then 
+        video_running=true
+    else
+        video_running=false
+    fi
+    
+}
+
+# Start XScreenSaver 
+start_xscreensaver
+
+
+# Poll and check for running video applications
+while true
+do
+    check_for_video_running
+    # echo "Video Running Status is: $video_running"
+
+    if $video_running; then
+        delay_xscreensaver
+    fi
+
+    # TODO: Optionally disable when fullscreen apps like presentations are running
+
+    # Adjust polling interval based on current XScreenSaver timeout
+    get_polling_interval
+    # echo "Polling interval is: $polling_interval seconds"
+
+    sleep $polling_interval
+done
