@@ -40,11 +40,10 @@ delay_xscreensaver()
 check_for_video_running()
 {
     pacmd_output=$(pacmd list-sink-inputs)
-    # if (echo $pacmd_output | grep -q 'media.role = "video"'); then
     if [[ $pacmd_output =~ 'media.role = "video"' ]]; then
-        video_open=true
+        video_role=true
     else
-        video_open=false
+        video_role=false
     fi
 
     if [[ $pacmd_output =~ 'state: RUNNING' ]]; then
@@ -53,7 +52,9 @@ check_for_video_running()
         application_running=false
     fi
 
-    if $video_open && $application_running; then 
+    # video_role isn't reliable. Just use application_running to assume video is reliable
+    # if $video_role && $application_running; then 
+    if $application_running; then 
         video_running=true
     else
         video_running=false

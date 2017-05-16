@@ -1,5 +1,5 @@
 # smart-xscreensaver
-Simple script to deactivate XScreenSaver while video is running (in a browser or video player)
+Simple script to deactivate XScreenSaver while video (or audio) is running (in a browser or video player)
 
 ### Features
 * Works for browser video as well as apps like VLC
