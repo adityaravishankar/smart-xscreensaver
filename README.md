@@ -12,12 +12,12 @@ Simple script to deactivate XScreenSaver while video is running (in a browser or
 1. Download smart-xscreensaver
 
 ```bash
-sudo wget https://raw.githubusercontent.com/adityaravishankar/smart-xscreensaver/master/smart-xscreensaver -O /usr/local/bin/
+sudo wget https://raw.githubusercontent.com/adityaravishankar/smart-xscreensaver/master/smart-xscreensaver -O /usr/local/bin/smart-xscreensaver
 ```
 
 2. Make smart-xscreensaver executable
 ```bash
-sudo chmod +x /usr/local/bin/
+sudo chmod +x /usr/local/bin/smart-xscreensaver
 ```
 
 3. Load smart-xscreensaver on boot using your OS startup application editor.
