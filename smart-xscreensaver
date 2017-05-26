@@ -1,86 +1,101 @@
-#!/bin/bash
+#!/usr/bin/env python3
 
-### Configurable Options ###
+import subprocess
+import time
+import os
+
+# Do not disable XScreenSaver if these apps are playing audio (no video only audio)
+AUDIO_PLAYERS = ["noise", "rhythmbox"]
+
+#stdoutdata = subprocess.Popen("pacmd list-sink-inputs", shell=True, stdout=subprocess.PIPE)
+# for line in stdoutdata.stdout:
+    # print(line)
+
+def get_pacmd_sinks():
+    """ Gets a list of sink-inputs from pacmd as an array """
+
+    pacmd_output_raw = subprocess.check_output("pacmd list-sink-inputs",
+                                               stderr=subprocess.STDOUT, shell=True)
+    pacmd_output = pacmd_output_raw.decode("UTF-8").splitlines()
+
+    # First line is of the form "1 sink input(s) available."
+    sinks_available = int(pacmd_output.pop(0).split(" ")[0])
+
+    sinks = [{}] * sinks_available
+
+    current_sink_index = -1
+    for line in pacmd_output:
+        if "index:" in line:
+            current_sink_index = current_sink_index + 1
+            current_sink = sinks[current_sink_index]
+        elif "\t\t" in line:
+
+            if " = " in line:
+                property_details = line.strip().split(" = ")
+                if len(property_details) == 2:
+                    current_sink["properties"][property_details[0]] = property_details[1][1:-1]
+
+        elif "\t" in line:
+
+            if "properties" in line:
+                current_sink["properties"] = {}
+
+            elif ": " in line:
+                property_details = line.strip().split(": ")
+                if len(property_details) == 2:
+                    current_sink[property_details[0]] = property_details[1]
+    print(sinks)
+    return sinks
+
+def video_is_running():
+    """ Checks pacmd sinks list for running, non audio-player app """
+    video_running = False
+    sinks = get_pacmd_sinks()
+
+    for sink in sinks:
+        if sink["state"] == "RUNNING":
+            binary_name = sink["properties"]["application.process.binary"]
+            if binary_name not in AUDIO_PLAYERS:
+                video_running = True
+
+    return video_running
+
+def start_xscreensaver():
+    subprocess.Popen(["xscreensaver", "-nosplash"],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def deactivate_xscreensaver():
+    subprocess.Popen(["xscreensaver-command", "-deactivate"],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+DEFAULT_TIMEOUT = 60
+CONFIG_PATH = os.path.expanduser("~") + "/.xscreensaver"
+def get_xscreensaver_timeout():
+    """ Read the xscreensaver config file if present and return timeout in seconds """
+
+    xscreensaver_timeout = DEFAULT_TIMEOUT
+
+    if os.path.isfile(CONFIG_PATH):
+        with open(CONFIG_PATH, "r") as config_file:
+            for line in config_file:
+                if "timeout:" in line:
+                    timeout = line.strip().split(":")
+                    xscreensaver_timeout = int(timeout[1]) * 3600 + int(timeout[2]) * 60 + int(timeout[3])
+                    break
+
+    return xscreensaver_timeout
+
+def watch_for_running_video():
+    while True:
+        # Check if video is running
+        if video_is_running():
+            deactivate_xscreensaver()
+
+        # Wait for 5 seconds less than the XScreenSaver timeout before checking again
+        timeout = get_xscreensaver_timeout() - 5
+        time.sleep(timeout)
 
 
+start_xscreensaver()
 
-### Do not edit beyond this line ###
-
-xscreensaver_config_file="$HOME/.xscreensaver"
-
-get_polling_interval()
-{
-    # echo "Looking for $xscreensaver_config_file"
-    if [ -f "$xscreensaver_config_file" ]; then
-        # echo "Found XScreenSaver config file"
-        timeout_seconds=$(grep timeout $xscreensaver_config_file | awk -F: '{ print ($2 * 3600) + ($3 * 60) + $4 }')
-        # echo "XScreenSaver Timeout is $timeout_seconds seconds"
-        
-        # Set polling interval to 5 seconds less than XScreenSaver timeout
-        polling_interval=$(($timeout_seconds - 5))
-    else
-        # echo "Could not find config file. Defaulting to 55 seconds."
-        polling_interval=55
-    fi
-}
-
-# Start XScreenSaver
-start_xscreensaver() 
-{
-    # echo "Starting XScreenSaver"
-    xscreensaver -nosplash & > /dev/null
-}
-
-delay_xscreensaver()
-{
-    # echo "Deactivating XScreenSaver"
-    xscreensaver-command -deactivate > /dev/null
-}
-
-check_for_video_running()
-{
-    pacmd_output=$(pacmd list-sink-inputs)
-    if [[ $pacmd_output =~ 'media.role = "video"' ]]; then
-        video_role=true
-    else
-        video_role=false
-    fi
-
-    if [[ $pacmd_output =~ 'state: RUNNING' ]]; then
-        application_running=true
-    else
-        application_running=false
-    fi
-
-    # video_role isn't reliable. Just use application_running to assume video is reliable
-    # if $video_role && $application_running; then 
-    if $application_running; then 
-        video_running=true
-    else
-        video_running=false
-    fi
-    
-}
-
-# Start XScreenSaver 
-start_xscreensaver
-
-
-# Poll and check for running video applications
-while true
-do
-    check_for_video_running
-    # echo "Video Running Status is: $video_running"
-
-    if $video_running; then
-        delay_xscreensaver
-    fi
-
-    # TODO: Optionally disable when fullscreen apps like presentations are running
-
-    # Adjust polling interval based on current XScreenSaver timeout
-    get_polling_interval
-    # echo "Polling interval is: $polling_interval seconds"
-
-    sleep $polling_interval
-done
+watch_for_running_video()
